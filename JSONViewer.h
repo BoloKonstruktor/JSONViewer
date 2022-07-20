@@ -20,7 +20,7 @@ class JSONViewer {
 		typedef struct {
 			uint32_t interval;
 			char url[64];
-		} TRDS;
+		} THTTP;
 		
 		uint8_t size = 0, idx = 0;
 		int8_t AT_MODE_PIN = -1;
@@ -28,7 +28,6 @@ class JSONViewer {
 		String devname = "", devver = "";
 		TDATA_REGISTER* data_register = NULL;
 		Stream* monitor = NULL;
-		ATCMD atcmd;
 		static JSONViewer* int_inst;
 		
 		TWIFI cfgwifi;
@@ -36,8 +35,8 @@ class JSONViewer {
 			"                                ",
 			"                                "
 		};
-		TRDS  cfgrds;
-		const TRDS defrds = {
+		THTTP  cfghttp;
+		const THTTP defhttp = {
 			5000, "https://weblukasz.pl/burze.dzis.net/json.php"
 		};
 
@@ -50,10 +49,12 @@ class JSONViewer {
 		static int8_t url_service( uint8_t, char*, char* );
 
 	public:
+		ATCMD atcmd;
 		JSONViewer( int8_t AT_MODE_PIN=-1, String devname="", String devver="" );
 		void begin( Stream* monitor, unsigned& addr );
 		void begin( Stream* monitor );
 		void register_callback( const char*, void(*callback)( const char* ) );
+		bool reload( String& );
 		void reload( void );
 		void loop( bool=false );
 		void set_url( const char* url );
