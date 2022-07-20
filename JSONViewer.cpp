@@ -12,14 +12,13 @@ JSONViewer* JSONViewer::int_inst = NULL;
 //Metody prywatne
 void JSONViewer::load( unsigned& addr, bool def ){
 	this->eep_addr = addr;
-	
-	load_param( addr, this->cfgrds, this->defrds, def );
+	load_param( addr, this->cfghttp, this->defhttp, def );
 	load_param( addr, this->cfgwifi, this->defwifi, def );
 }
 
 void JSONViewer::save( void ){
 	unsigned addr = this->eep_addr;
-	save_param( addr, this->cfgrds );
+	save_param( addr, this->cfghttp );
 	save_param( addr, this->cfgwifi );
 }
 
@@ -110,13 +109,13 @@ void JSONViewer::register_callback( const char* path, void(*callback)( const cha
     this->idx = 0;		
 }
 
-void JSONViewer::reload( void ){	 
+bool JSONViewer::reload( String& log ){	 
 	HTTPClient https;	
 	this->monitor->print( F("\n[HTTP] Opening URL: ") );
-	this->monitor->print( this->cfgrds.url );
+	this->monitor->print( this->cfghttp.url );
 	this->monitor->println( F(" ...") );
             
-		if( https.begin( this->cfgrds.url ) ) {
+		if( https.begin( this->cfghttp.url ) ) {
 			int httpCode = https.GET();
 
 				if( httpCode > 0 ){  
@@ -147,11 +146,26 @@ void JSONViewer::reload( void ){
 								}
 						}
 				} else {
-					this->monitor->printf( "[HTTPS] GET... failed, error: %s\n", https.errorToString( httpCode ).c_str() );
+					this->monitor->printf( "[HTTP] GET... failed, error: %s\n", https.errorToString( httpCode ).c_str() );
+					log = https.errorToString( httpCode ).c_str();
+					https.end();
+					return false;
 				}
                               
 			https.end();
-		}	
+		} else {
+			log = "URL opening error";
+			this->monitor->print( F("[HTTP] ") );
+			this->monitor->println( log );
+			return false;
+		}
+
+	return true;
+}
+
+void JSONViewer::reload( void ){
+	String log = "";
+	this->reload( log );
 }
 
 void JSONViewer::begin( Stream* monitor ){
@@ -166,7 +180,7 @@ void JSONViewer::loop( bool stop ){
 	uint32_t curr = millis();
 	static uint32_t update = 0;
 
-		if( curr - update >= this->cfgrds.interval ){
+		if( curr - update >= this->cfghttp.interval ){
 			update = curr;
 			this->reload();
 		}
@@ -257,7 +271,7 @@ int8_t JSONViewer::url_service( uint8_t inout, char * cmd, char * params ) {
 		switch( inout ){
 			case 0:{
 				int_inst->monitor->print( F("Zapisany URL: ") );
-				int_inst->monitor->println( int_inst->cfgrds.url );
+				int_inst->monitor->println( int_inst->cfghttp.url );
 			}break;
 			case 1:{
 				String url = params;
@@ -275,7 +289,7 @@ int8_t JSONViewer::url_service( uint8_t inout, char * cmd, char * params ) {
 						return -1;
 					}
 					
-				strcpy( int_inst->cfgrds.url, url.c_str() );
+				strcpy( int_inst->cfghttp.url, url.c_str() );
 				int_inst->save();
 			}break;
 		}
@@ -284,5 +298,5 @@ int8_t JSONViewer::url_service( uint8_t inout, char * cmd, char * params ) {
 }
 
 void JSONViewer::set_url( const char* url ){
-	strcpy( this->cfgrds.url, url );
+	strcpy( this->cfghttp.url, url );
 }
