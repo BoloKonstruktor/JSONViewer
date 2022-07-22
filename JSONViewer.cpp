@@ -22,6 +22,23 @@ void JSONViewer::save( void ){
 	save_param( addr, this->cfgwifi );
 }
 
+void JSONViewer::enlarge_array( void ){
+	this->size++;
+	
+		if( this->size == 1 ){
+			this->data_register = new TDATA_REGISTER[this->size];
+		} else {
+			TDATA_REGISTER* buff = new TDATA_REGISTER[this->size];
+			arrcpy( buff, this->data_register, this->size-1 );
+			delete[] this->data_register;
+			this->data_register = new TDATA_REGISTER[this->size];
+			arrcpy( this->data_register, buff, this->size-1 );  
+			delete[] buff;
+		}
+
+    this->idx = this->size-1;	
+}
+
 //Metody publiczne
 JSONViewer::JSONViewer( int8_t AT_MODE_PIN, String devname, String devver ){
 	this->AT_MODE_PIN = AT_MODE_PIN;
@@ -89,23 +106,18 @@ void JSONViewer::begin( Stream* monitor, unsigned& addr ){
 }
 
 void JSONViewer::register_callback( const char* path, void(*callback)( const char* ) ){
-	this->size++;
-	
-		if( this->size == 1 ){
-			this->data_register = new TDATA_REGISTER[this->size];
-		} else {
-			TDATA_REGISTER* buff = new TDATA_REGISTER[this->size];
-			arrcpy( buff, this->data_register, this->size-1 );
-			delete[] this->data_register;
-			this->data_register = new TDATA_REGISTER[this->size];
-			arrcpy( this->data_register, buff, this->size-1 );  
-			delete[] buff;
-		}
-
-    this->idx = this->size-1;
+	this->enlarge_array();
     auto& data_register = this->data_register[this->idx];
     strcpy( data_register.path, path );
-	data_register.callback = callback;
+	data_register.str_callback = callback;
+    this->idx = 0;		
+}
+
+void JSONViewer::register_callback( const char* path, void(*callback)( JsonObject ) ){
+	this->enlarge_array();
+    auto& data_register = this->data_register[this->idx];
+    strcpy( data_register.path, path );
+	data_register.json_callback = callback;
     this->idx = 0;		
 }
 
@@ -125,9 +137,7 @@ bool JSONViewer::reload( String& log ){
 							String json = extractJSON( https.getString() );	
 							this->monitor->print( F("RAW JSON:") );
 							this->monitor->println( json );
-                  
-							deserializeJson( doc, json );
-							
+							deserializeJson( doc, json );	
 											
 								for( uint8_t i=0; i<this->size; i++ ){
 									auto dr = this->data_register[i];
@@ -138,9 +148,15 @@ bool JSONViewer::reload( String& log ){
 										for( uint8_t ii=0; ii<s-1; ii++ ){
 											obj = obj[path[ii]];
 										}
-													
-										if( dr.callback && s ){
-											dr.callback( obj[path[s-1]] );
+										
+										if( obj[path[s-1]].is<JsonObject>() ){
+												
+												if( dr.json_callback && s ){
+													dr.json_callback( obj[path[s-1]] );
+												}			
+										
+										} else if( dr.str_callback && s ){
+											dr.str_callback( obj[path[s-1]] );
 										}
 										
 								}
