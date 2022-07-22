@@ -39,7 +39,7 @@ class JSONViewer {
 		};
 		THTTP  cfghttp;
 		const THTTP defhttp = {
-			5000, "https://rds.eurozet.pl/reader/var/antyradio.json"
+			5000, "https://weblukasz.pl/burze.dzis.net/json.php"
 		};
 
 		
