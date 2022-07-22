@@ -1,6 +1,7 @@
 #ifndef JSONViewer_H
 #define JSONViewer_H
 #include "Arduino.h"
+#include <ArduinoJson.h>
 #include "at.hpp"
 
 
@@ -9,7 +10,8 @@ class JSONViewer {
 	private:
 		typedef struct {
 			char path[64];
-			void(*callback)( const char* );
+			void(*str_callback)( const char* );
+			void(*json_callback)( JsonObject );
 		}TDATA_REGISTER;
 		
 		typedef struct {
@@ -37,13 +39,14 @@ class JSONViewer {
 		};
 		THTTP  cfghttp;
 		const THTTP defhttp = {
-			5000, "https://weblukasz.pl/burze.dzis.net/json.php"
+			5000, "https://rds.eurozet.pl/reader/var/antyradio.json"
 		};
 
 		
 	protected:	
 		void load( unsigned&, bool=false );
 		void save( void );
+		void enlarge_array( void );
 		static int8_t wifi_service( uint8_t, char*, char* );
 		static int8_t wifi_scan_service( uint8_t, char*, char* );
 		static int8_t url_service( uint8_t, char*, char* );
@@ -54,6 +57,7 @@ class JSONViewer {
 		void begin( Stream* monitor, unsigned& addr );
 		void begin( Stream* monitor );
 		void register_callback( const char*, void(*callback)( const char* ) );
+		void register_callback( const char*, void(*callback)( JsonObject ) );
 		bool reload( String& );
 		void reload( void );
 		void loop( bool=false );
