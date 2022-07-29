@@ -112,7 +112,11 @@ bool is_digit( const char* str ){
   uint8_t* buff = (uint8_t*)data;
   
       for ( uint16_t i = 0; i < size; i++ ){
+#ifdef ESP32
         buff[i] = EEPROM.readUChar( offset );
+#else
+		buff[i] = EEPROM.read( offset );
+#endif
         offset++;
   
           if ( offset == EEPROM.length() ) break;
@@ -125,7 +129,11 @@ bool is_digit( const char* str ){
     const uint8_t* buff = (uint8_t*)data;
       
       for ( uint16_t i = 0; i < size; i++ ){
+#ifdef ESP32
         EEPROM.writeUChar( offset, buff[i] );
+#else
+		EEPROM.write( offset, buff[i] );
+#endif
         offset++;
   
           if ( offset == EEPROM.length() ) break;

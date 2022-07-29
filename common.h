@@ -1,11 +1,15 @@
 #ifndef COMMON_H
 #define COMMON_H
 #include "EEPROM.h"
+#ifdef ESP32
 #include <WiFi.h>
 #include <WiFiMulti.h>
 #include <HTTPClient.h>
-#include <WiFiClientSecure.h>
-#include <ArduinoJson.h>
+#else
+#include <ESP8266WiFi.h>
+#include <ESP8266WiFiMulti.h>
+#include <ESP8266HTTPClient.h>	
+#endif
 
 	template< typename Arr > void arrcpy( Arr& to, const Arr from, unsigned size ){
 			for( unsigned i = 0; i < size; i++ ){

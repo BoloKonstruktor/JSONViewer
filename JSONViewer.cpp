@@ -5,7 +5,7 @@
 
 
 //WiFiMulti WiFiMulti;
-StaticJsonDocument<512> doc;
+StaticJsonDocument<1024> doc;
 
 JSONViewer* JSONViewer::int_inst = NULL;
 
@@ -60,15 +60,19 @@ void JSONViewer::begin( Stream* monitor, unsigned& addr ){
 			this->atcmd.registerCallback( "AT+WIFI", wifi_service );
 			this->atcmd.registerCallback( "AT+WIFI-SCAN", wifi_scan_service );
 			this->atcmd.registerCallback( "AT+URL", url_service );
-
+#ifdef ESP32
 				if( !EEPROM.begin( 1000 ) ) {
 					this->monitor->println("Failed to initialise EEPROM");
 					this->monitor->println("Restarting...");
 					delay(500);
 					ESP.restart();
 				}
+#else
+			EEPROM.begin( 512 );
+#endif
 
 			this->load( addr );
+			delay( 3000 );
 			bool cfg = digitalRead( this->AT_MODE_PIN );
 			String ssid = this->cfgwifi.ssid;
 			ssid.trim();
@@ -126,8 +130,16 @@ bool JSONViewer::reload( String& log ){
 	this->monitor->print( F("\n[HTTP] Opening URL: ") );
 	this->monitor->print( this->cfghttp.url );
 	this->monitor->println( F(" ...") );
-            
+	
+#ifdef ESP8266
+	WiFiClientSecure client;
+	client.setInsecure(); //the magic line, use with caution
+	client.connect( this->cfghttp.url, 443 );
+		
+		if( https.begin( client, this->cfghttp.url ) ) {
+#else      
 		if( https.begin( this->cfghttp.url ) ) {
+#endif
 			int httpCode = https.GET();
 
 				if( httpCode > 0 ){  
@@ -146,7 +158,14 @@ bool JSONViewer::reload( String& log ){
 									JsonObject obj = doc.as<JsonObject>();					
 									
 										for( uint8_t ii=0; ii<s-1; ii++ ){
-											obj = obj[path[ii]];
+											
+											if( obj.containsKey( path[ii] ) ) obj = obj[path[ii]];
+										}
+										
+										if( !obj.containsKey( path[s-1] ) ) {
+											log = "[JSON] parser error.";
+											this->monitor->println( log );
+											return false;
 										}
 										
 										if( obj[path[s-1]].is<JsonObject>() ){
@@ -170,8 +189,7 @@ bool JSONViewer::reload( String& log ){
                               
 			https.end();
 		} else {
-			log = "URL opening error";
-			this->monitor->print( F("[HTTP] ") );
+			log = "[HTTP] URL opening error";
 			this->monitor->println( log );
 			return false;
 		}
