@@ -106,6 +106,8 @@ void JSONViewer::begin( Stream* monitor, unsigned& addr ){
 				}
 		  
 			this->monitor->println(" connected");
+			this->monitor->print( F("IP address: ") );
+			this->monitor->println( WiFi.localIP() );
 		}
 }
 
@@ -147,7 +149,7 @@ bool JSONViewer::reload( String& log ){
                     
 						if( httpCode == HTTP_CODE_OK || httpCode == HTTP_CODE_MOVED_PERMANENTLY ){
 							String json = extractJSON( https.getString() );	
-							this->monitor->print( F("RAW JSON:") );
+							this->monitor->print( F("[JSON] ") );
 							this->monitor->println( json );
 							deserializeJson( doc, json );	
 											
