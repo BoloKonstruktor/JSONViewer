@@ -160,6 +160,7 @@ bool JSONViewer::reload( String& log ){
 										for( uint8_t ii=0; ii<s-1; ii++ ){
 											
 											if( obj.containsKey( path[ii] ) ) obj = obj[path[ii]];
+											else break;
 										}
 										 
 										if( !obj.containsKey( path[s-1] ) ) {
