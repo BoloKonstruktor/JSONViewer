@@ -96,9 +96,11 @@ void JSONViewer::begin( Stream* monitor, unsigned& addr ){
 			
 				if( this->devname != "" ) WiFi.setHostname( this->devname.c_str() );
 
+			this->monitor->println();
+			this->monitor->println();
 			this->monitor->print( F("Waiting for WiFi to connect ") );
 			this->monitor->print( this->cfgwifi.ssid );
-			this->monitor->print( F(" ...") );
+			this->monitor->print( F(" ") );
 			
 				while( (WiFi.status() != WL_CONNECTED) ) {
 					this->monitor->print(".");
