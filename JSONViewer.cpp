@@ -5,20 +5,18 @@
 
 
 //WiFiMulti WiFiMulti;
-StaticJsonDocument<1024> doc;
+//StaticJsonDocument<2048> doc;
 
 JSONViewer* JSONViewer::int_inst = NULL;
 
 //Metody prywatne
 void JSONViewer::load( unsigned& addr, bool def ){
 	this->eep_addr = addr;
-	load_param( addr, this->cfghttp, this->defhttp, def );
 	load_param( addr, this->cfgwifi, this->defwifi, def );
 }
 
 void JSONViewer::save( void ){
 	unsigned addr = this->eep_addr;
-	save_param( addr, this->cfghttp );
 	save_param( addr, this->cfgwifi );
 }
 
@@ -59,7 +57,6 @@ void JSONViewer::begin( Stream* monitor, unsigned& addr ){
 			this->atcmd.begin( this->monitor, devname.c_str() );
 			this->atcmd.registerCallback( "AT+WIFI", wifi_service );
 			this->atcmd.registerCallback( "AT+WIFI-SCAN", wifi_scan_service );
-			this->atcmd.registerCallback( "AT+URL", url_service );
 #ifdef ESP32
 				if( !EEPROM.begin( 1000 ) ) {
 					this->monitor->println("Failed to initialise EEPROM");
@@ -72,7 +69,7 @@ void JSONViewer::begin( Stream* monitor, unsigned& addr ){
 #endif
 
 			this->load( addr );
-			delay( 3000 );
+			delay( 1000 );
 			bool cfg = digitalRead( this->AT_MODE_PIN );
 			String ssid = this->cfgwifi.ssid;
 			ssid.trim();
@@ -113,98 +110,89 @@ void JSONViewer::begin( Stream* monitor, unsigned& addr ){
 		}
 }
 
-void JSONViewer::register_callback( const char* path, void(*callback)( const char* ) ){
+void JSONViewer::register_callback( const char* url, const char* path, void(*callback)( const char* ) ){
 	this->enlarge_array();
     auto& data_register = this->data_register[this->idx];
+		if( data_register.url == NULL ) data_register.url = new char[strlen( url )+1];
+    strcpy( data_register.url, url );
+		if( data_register.path == NULL ) data_register.path = new char[strlen( path )+1];
     strcpy( data_register.path, path );
 	data_register.str_callback = callback;
     this->idx = 0;		
 }
 
-void JSONViewer::register_callback( const char* path, void(*callback)( JsonObject ) ){
+void JSONViewer::register_callback( const char* url, const char* path, void(*callback)( JsonObject ) ){
 	this->enlarge_array();
     auto& data_register = this->data_register[this->idx];
+		if( data_register.url == NULL ) data_register.url = new char[strlen( url )+1];
+    strcpy( data_register.url, url );
+		if( data_register.path == NULL ) data_register.path = new char[strlen( path )+1];
     strcpy( data_register.path, path );
 	data_register.json_callback = callback;
     this->idx = 0;		
 }
 
-bool JSONViewer::reload( String& log ){	 
-	HTTPClient https;	
-	this->monitor->print( F("\n[HTTP] Opening URL: ") );
-	this->monitor->print( this->cfghttp.url );
-	this->monitor->println( F(" ...") );
-	
+void JSONViewer::reload( void ){
+		for( uint8_t i=0; i<this->size; i++ ){
+			auto dr = this->data_register[i];
+			HTTPClient https;	
+			this->monitor->print( F("\n[HTTP] Opening URL: ") );
+			this->monitor->print( dr.url );
+			this->monitor->println( F(" ...") );
+			
 #ifdef ESP8266
-	WiFiClientSecure client;
-	client.setInsecure(); //the magic line, use with caution
-	client.connect( this->cfghttp.url, 443 );
-		
-		if( https.begin( client, this->cfghttp.url ) ) {
+			WiFiClientSecure client;
+			client.setInsecure(); //the magic line, use with caution
+			client.connect( dr.url, 443 );
+				
+				if( https.begin( client, dr.url ) ) {
 #else      
-		if( https.begin( this->cfghttp.url ) ) {
+				if( https.begin( dr.url ) ) {
 #endif
-			int httpCode = https.GET();
+					int httpCode = https.GET();
 
-				if( httpCode > 0 ){  
-					this->monitor->printf( "[HTTP] Returned code: %d\n", httpCode );
-                    
-						if( httpCode == HTTP_CODE_OK || httpCode == HTTP_CODE_MOVED_PERMANENTLY ){
-							String json = extractJSON( https.getString() );	
-							this->monitor->print( F("[JSON] ") );
-							this->monitor->println( json );
-							deserializeJson( doc, json );	
-											
-								for( uint8_t i=0; i<this->size; i++ ){
-									auto dr = this->data_register[i];
+						if( httpCode > 0 ){  
+							this->monitor->printf( "[HTTP] Returned code: %d\n", httpCode );
+							
+								if( httpCode == HTTP_CODE_OK || httpCode == HTTP_CODE_MOVED_PERMANENTLY ){
+									String json = extractJSON( https.getString() );
+									DynamicJsonDocument doc( 2048 );
+									this->monitor->print( F("[JSON] ") );
+									this->monitor->println( json );
+									deserializeJson( doc, json );	
 									unsigned s = 0;
 									String* path = extractPath( dr.path, s );
 									JsonObject obj = doc.as<JsonObject>();					
-									
-										for( uint8_t ii=0; ii<s-1; ii++ ){
 											
+										for( uint8_t ii=0; ii<s-1; ii++ ){
+													
 											if( obj.containsKey( path[ii] ) ) obj = obj[path[ii]];
 											else break;
 										}
-										 
+												 
 										if( !obj.containsKey( path[s-1] ) ) {
-											log = "[JSON] parser error.";
-											this->monitor->println( log );
-											return false;
+											return;
 										}
-										
-										if( obj[path[s-1]].is<JsonObject>() ){
 												
+										if( obj[path[s-1]].is<JsonObject>() ){
+														
 												if( dr.json_callback && s ){
 													dr.json_callback( obj[path[s-1]] );
 												}			
-										
+												
 										} else if( dr.str_callback && s ){
 											dr.str_callback( obj[path[s-1]] );
 										}
-										
+												
 								}
+						} else {
+							this->monitor->printf( "[HTTP] GET... failed, error: %s\n", https.errorToString( httpCode ).c_str() );
+							https.end();
 						}
-				} else {
-					this->monitor->printf( "[HTTP] GET... failed, error: %s\n", https.errorToString( httpCode ).c_str() );
-					log = https.errorToString( httpCode ).c_str();
+									  
 					https.end();
-					return false;
 				}
-                              
-			https.end();
-		} else {
-			log = "[HTTP] URL opening error";
-			this->monitor->println( log );
-			return false;
 		}
-
-	return true;
-}
-
-void JSONViewer::reload( void ){
-	String log = "";
-	this->reload( log );
 }
 
 void JSONViewer::begin( Stream* monitor ){
@@ -219,7 +207,7 @@ void JSONViewer::loop( bool stop ){
 	uint32_t curr = millis();
 	static uint32_t update = 0;
 
-		if( curr - update >= this->cfghttp.interval ){
+		if( curr - update >= 5000 ){
 			update = curr;
 			this->reload();
 		}
@@ -301,41 +289,4 @@ int8_t JSONViewer::wifi_scan_service( uint8_t inout, char * cmd, char * params )
 		}
   
 return 0;
-}
-
-int8_t JSONViewer::url_service( uint8_t inout, char * cmd, char * params ) {
-
-		if( int_inst == NULL ) return -1;
-		
-		switch( inout ){
-			case 0:{
-				int_inst->monitor->print( F("Zapisany URL: ") );
-				int_inst->monitor->println( int_inst->cfghttp.url );
-			}break;
-			case 1:{
-				String url = params;
-				url.trim();
-				
-				int http = url.indexOf("http://"), https = url.indexOf("https://");
-				
-					if( http == -1 && https == -1 ){
-						int_inst->monitor->println( F("Nieprawidłowy URL") );
-						return -1;
-					}
-					
-					if( url.length() > 64 ){
-						int_inst->monitor->println( F("URL może zawierać maksymalnie 64 znaki") );
-						return -1;
-					}
-					
-				strcpy( int_inst->cfghttp.url, url.c_str() );
-				int_inst->save();
-			}break;
-		}
-	
-	return 0;
-}
-
-void JSONViewer::set_url( const char* url ){
-	strcpy( this->cfghttp.url, url );
 }
