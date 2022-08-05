@@ -207,7 +207,7 @@ void JSONViewer::loop( bool stop ){
 	uint32_t curr = millis();
 	static uint32_t update = 0;
 
-		if( curr - update >= 5000 ){
+		if( curr - update >= 10000 ){
 			update = curr;
 			this->reload();
 		}
