@@ -143,7 +143,7 @@ void JSONViewer::reload( void ){
 #ifdef ESP8266
 			WiFiClientSecure client;
 			client.setInsecure(); //the magic line, use with caution
-			client.connect( dr.url, 443 );
+			//client.connect( dr.url, 443 );
 				
 				if( https.begin( client, dr.url ) ) {
 #else      
@@ -207,7 +207,7 @@ void JSONViewer::loop( bool stop ){
 	uint32_t curr = millis();
 	static uint32_t update = 0;
 
-		if( curr - update >= 10000 ){
+		if( (curr-update) >= (5000*this->size) ){
 			update = curr;
 			this->reload();
 		}
